@@ -28,6 +28,22 @@ No agent has shell access, filesystem access, or the ability to choose a command
 The single executable capability is one fixed build invocation the model cannot
 parameterise.
 
+### Why the Anthropic SDK directly, and not Spring AI
+
+The model boundary is three methods (`ModelProvider`), sitting on the official
+`com.anthropic:anthropic-java` SDK.
+
+Spring AI's principal feature is making **model-invoked tool calling** easy — and
+that is precisely the thing this architecture refuses to do. The model here does
+not get tools; it returns proposals, and deterministic Java decides what executes.
+Adopting the framework whose value proposition is "let the model call your
+functions" would work directly against the property the system exists to
+demonstrate, while adding a second abstraction over an API the seam already
+isolates.
+
+The boundary is also the security control. It is small enough to own outright,
+and small enough for a reviewer to audit by reading one file.
+
 ---
 
 ## Architecture

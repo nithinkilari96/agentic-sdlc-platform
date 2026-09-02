@@ -33,7 +33,15 @@ public class RepositoryAnalysisAgent implements Agent {
     /** Enough for the model to infer conventions without flooding the context. */
     private static final int MAX_FILES_IN_DIGEST = 40;
     private static final int MAX_BYTES_PER_FILE = 4_000;
-    private static final List<String> SKIPPED_DIRS = List.of(".git", "build", ".gradle", "out");
+    /**
+     * Excluded from the digest. Alongside build output, this skips the gradle
+     * wrapper: the platform installs it into every workspace, so including it
+     * would make a genuinely empty greenfield repository look like an existing
+     * codebase — and the agent would describe conventions that are the
+     * platform's, not the project's.
+     */
+    private static final List<String> SKIPPED_DIRS =
+            List.of(".git", "build", ".gradle", "out", "gradle");
 
     private static final String SYSTEM_PROMPT = """
             You are a software architect examining an existing codebase before it is modified.
