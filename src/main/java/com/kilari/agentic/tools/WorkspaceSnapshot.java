@@ -8,6 +8,9 @@ import java.io.UncheckedIOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HexFormat;
+import java.security.NoSuchAlgorithmException;
+import java.security.MessageDigest;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Instant;
@@ -206,9 +209,9 @@ public class WorkspaceSnapshot {
     /** Content hash over raw bytes, so binaries hash as reliably as source files. */
     private static String sha256(byte[] content) {
         try {
-            return java.util.HexFormat.of().formatHex(
-                    java.security.MessageDigest.getInstance("SHA-256").digest(content));
-        } catch (java.security.NoSuchAlgorithmException e) {
+            return HexFormat.of().formatHex(
+                    MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 unavailable", e);
         }
     }

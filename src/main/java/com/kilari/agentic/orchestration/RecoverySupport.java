@@ -33,9 +33,8 @@ public final class RecoverySupport {
      * latency and MTTR meaningless after any restart.
      */
     public static void restoreExecutionState(WorkflowRun run, int repairRounds, int rollbackCount,
-                                             int retryCount, java.time.Instant startedAt,
-                                             java.time.Instant firstFailureAt,
-                                             java.time.Instant finishedAt) {
+                                             int retryCount, Instant startedAt,
+                                             Instant firstFailureAt, Instant finishedAt) {
         run.restoreExecutionState(repairRounds, rollbackCount, retryCount,
                 startedAt, firstFailureAt, finishedAt);
     }

@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -128,7 +129,7 @@ class GuardrailTest {
         void the_build_environment_is_stripped_of_anything_credential_shaped() {
             // A generated build script executes arbitrary code by design, so it
             // must not inherit anything worth stealing.
-            Map<String, String> environment = new java.util.HashMap<>(Map.of(
+            Map<String, String> environment = new HashMap<>(Map.of(
                     "ANTHROPIC_API_KEY", "sk-secret",
                     "AWS_SECRET_ACCESS_KEY", "aws-secret",
                     "GITHUB_TOKEN", "ghp_secret",

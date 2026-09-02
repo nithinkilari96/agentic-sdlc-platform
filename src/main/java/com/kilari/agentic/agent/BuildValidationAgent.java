@@ -4,6 +4,7 @@ import com.kilari.agentic.orchestration.AgentType;
 import com.kilari.agentic.tools.BuildValidator;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -48,7 +49,7 @@ public class BuildValidationAgent implements Agent {
                     AgentOutcome.Signal.CONTINUE,
                     "Build and tests passed in %dms".formatted(result.elapsed().toMillis()),
                     artifacts,
-                    java.util.List.of(),
+                    List.of(),
                     evidence);
         }
 
@@ -60,7 +61,7 @@ public class BuildValidationAgent implements Agent {
                 Map.of(
                         ContextKeys.VALIDATION_RESULT, "FAILED",
                         ContextKeys.VALIDATION_FAILURE, result.failureSummary()),
-                java.util.List.of(),
+                List.of(),
                 evidence);
     }
 }

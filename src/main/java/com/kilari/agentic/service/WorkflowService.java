@@ -3,6 +3,7 @@ package com.kilari.agentic.service;
 import com.kilari.agentic.agent.FileChange;
 import com.kilari.agentic.agent.PatchEnvelope;
 import com.kilari.agentic.metrics.WorkflowMetrics;
+import com.kilari.agentic.orchestration.DecisionRecord;
 import com.kilari.agentic.orchestration.WorkflowEngine;
 import com.kilari.agentic.orchestration.WorkflowGraph;
 import com.kilari.agentic.orchestration.WorkflowPlanner;
@@ -23,6 +24,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
@@ -146,7 +148,7 @@ public class WorkflowService {
      * rejected by the same guard that would have rejected it a second later.
      * The loser gets a clear conflict rather than a silent double action.
      */
-    private void withDecisionLock(String workflowId, java.util.function.Consumer<WorkflowRun> action) {
+    private void withDecisionLock(String workflowId, Consumer<WorkflowRun> action) {
         ReentrantLock lock = decisionLocks.computeIfAbsent(workflowId, id -> new ReentrantLock());
         lock.lock();
         try {
@@ -203,10 +205,10 @@ public class WorkflowService {
             }
 
             log.info("Resuming interrupted workflow {} from state {}", workflowId, run.state());
-            run.context().record(com.kilari.agentic.orchestration.DecisionRecord.of(
+            run.context().record(DecisionRecord.of(
                     workflowId, null,
-                    com.kilari.agentic.orchestration.DecisionRecord.Actor.ORCHESTRATOR,
-                    com.kilari.agentic.orchestration.DecisionRecord.DecisionType.RECOVERY_RESUMED,
+                    DecisionRecord.Actor.ORCHESTRATOR,
+                    DecisionRecord.DecisionType.RECOVERY_RESUMED,
                     run.context().revision(),
                     "Resumed after process restart from last checkpoint"));
 
