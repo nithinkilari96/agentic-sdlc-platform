@@ -68,10 +68,17 @@ public final class WorkflowPlanner {
      * consumes the failure evidence, then a fresh apply and a fresh validation,
      * with the approval gate re-attached at the end.
      *
-     * <p>The failed validation node is superseded rather than deleted, so the
-     * lineage still shows that it ran and what it found.
+     * <p>The validation node that reported the failure stays SUCCEEDED and is not
+     * superseded. That is deliberate rather than an oversight: the validation
+     * <em>task</em> did its job — it ran the build and returned a truthful
+     * answer. What failed is the change, not the task. Its finding is real
+     * history and the lineage records it.
+     *
+     * <p>What must be removed is the approval gate hanging off it. Left in place,
+     * a human would be asked to approve a change whose build failed. Superseding
+     * it is therefore the load-bearing part of this revision.
      */
-    public static WorkflowGraph.PlanRevision repairRevision(int round, String previousValidateTaskId) {
+    public static WorkflowGraph.PlanRevision repairRevision(int round) {
         String repair = "repair-" + round;
         String apply = "patch-apply-" + round;
         String validate = "validate-" + round;
@@ -83,7 +90,7 @@ public final class WorkflowPlanner {
                         node(apply, AgentType.PATCH_APPLY, repair),
                         node(validate, AgentType.BUILD_VALIDATION, apply),
                         node(release, AgentType.RELEASE_READINESS, validate)),
-                List.of(previousValidateTaskId, releaseTaskFor(round - 1)),
+                List.of(releaseTaskFor(round - 1)),
                 "validation failed; inserting a repair round driven by the failure evidence");
     }
 

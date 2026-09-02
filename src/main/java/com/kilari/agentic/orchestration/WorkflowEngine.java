@@ -224,7 +224,7 @@ public class WorkflowEngine {
                         outcome.summary(), outcome.evidence());
                 metrics.recordValidationFailure();
                 run.recordFailureMoment();
-                planRepair(run, node);
+                planRepair(run);
             }
 
             case SAFE_STOP -> {
@@ -256,7 +256,7 @@ public class WorkflowEngine {
      * would layer edits on top of the last and the diff would stop being
      * reviewable by round two.
      */
-    private void planRepair(WorkflowRun run, TaskNode failedValidation) {
+    private void planRepair(WorkflowRun run) {
         if (run.repairRounds() >= MAX_REPAIR_ROUNDS) {
             rollbackToLastSnapshot(run, "repair budget exhausted");
             run.transitionTo(WorkflowState.FAILED,
@@ -274,7 +274,7 @@ public class WorkflowEngine {
                 "validation failed; repair round %d planned from build evidence".formatted(round));
 
         WorkflowGraph.PlanDelta delta = run.graph().applyRevision(
-                WorkflowPlanner.repairRevision(round, failedValidation.id()));
+                WorkflowPlanner.repairRevision(round));
 
         record(run, null, Actor.ORCHESTRATOR, DecisionType.PLAN_REVISED,
                 "Re-planned at revision %d: added %s, superseded %s"
