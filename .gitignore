@@ -1,0 +1,27 @@
+# Secrets — never commit
+.env
+*.pem
+*.key
+
+# Build output
+build/
+out/
+bin/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle
+.gradle/
+
+# IDE
+.idea/
+*.iml
+*.iws
+.vscode/
+
+# OS
+.DS_Store
+
+# Agent runtime artifacts (generated workspaces, snapshots, logs)
+workspaces/
+run-artifacts/
+*.log
