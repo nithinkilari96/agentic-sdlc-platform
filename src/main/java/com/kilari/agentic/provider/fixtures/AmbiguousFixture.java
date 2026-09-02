@@ -29,7 +29,7 @@ public class AmbiguousFixture implements ScenarioFixture {
 
     @Override
     public String respond(ModelRequest request) {
-        boolean clarified = request.userPrompt()
+        boolean clarified = request.requirement()
                 .toLowerCase(Locale.ROOT)
                 .contains(CLARIFICATION_MARKER);
 

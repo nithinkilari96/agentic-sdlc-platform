@@ -26,6 +26,9 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     runtimeOnly("com.h2database:h2")
 
+    // Instant/Duration support when serialising checkpoints to JSON.
+    implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
+
     // Audit-grade observability + the reliability metrics the brief names.
     implementation("org.springframework.boot:spring-boot-starter-actuator")
     runtimeOnly("io.micrometer:micrometer-registry-prometheus")

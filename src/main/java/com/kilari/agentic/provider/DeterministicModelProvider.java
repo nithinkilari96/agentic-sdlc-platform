@@ -28,10 +28,20 @@ import java.util.Locale;
  */
 public class DeterministicModelProvider implements ModelProvider {
 
+    /**
+     * Order is significant: specific fixtures are tried before general ones.
+     *
+     * <p>The ambiguous fixture matches on "analytics", which also appears in the
+     * greenfield requirement ("...click analytics and reliability features").
+     * Matching it first would classify a perfectly specific requirement as too
+     * vague to act on. The two concrete scenarios are therefore checked first,
+     * and the ambiguous fixture is the fallback — which mirrors how the real
+     * system behaves, since ambiguity is what remains when nothing specific fits.
+     */
     private final List<ScenarioFixture> fixtures = List.of(
-            new AmbiguousFixture(),
+            new GreenfieldFixture(),
             new BrownfieldFixture(),
-            new GreenfieldFixture());
+            new AmbiguousFixture());
 
     @Override
     public String name() {
@@ -45,10 +55,14 @@ public class DeterministicModelProvider implements ModelProvider {
 
     @Override
     public ModelResponse complete(ModelRequest request) {
-        String prompt = request.userPrompt().toLowerCase(Locale.ROOT);
+        // Matched against the requirement alone. The full prompt accumulates the
+        // repository digest, and the seeded shortener's own files mention "url
+        // shortener" - matching on that would classify a brownfield change as a
+        // greenfield build.
+        String requirement = request.requirement().toLowerCase(Locale.ROOT);
 
         ScenarioFixture fixture = fixtures.stream()
-                .filter(f -> f.matches(prompt))
+                .filter(f -> f.matches(requirement))
                 .findFirst()
                 .orElseThrow(() -> new ModelProviderException(
                         """

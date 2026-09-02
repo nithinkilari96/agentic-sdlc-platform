@@ -5,7 +5,6 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -17,7 +16,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import com.kilari.agentic.agent.FileChange;
 
 /**
  * An immutable copy of the workspace contents, taken before a mutating step.
@@ -32,17 +30,22 @@ public class WorkspaceSnapshot {
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceSnapshot.class);
 
-    /** Directories never worth snapshotting; build output is regenerated anyway. */
-    private static final List<String> EXCLUDED_DIRS = List.of(".git", "build", ".gradle", "out");
+    /**
+     * Directories not worth snapshotting. Build output is regenerated anyway, and
+     * the gradle wrapper is platform-managed — {@link PathPolicy} forbids agents
+     * from writing it, so it cannot change and does not need restoring.
+     */
+    private static final List<String> EXCLUDED_DIRS =
+            List.of(".git", "build", ".gradle", "out", "gradle");
 
     private final String snapshotId;
     private final Path root;
-    private final Map<String, String> contents;
+    private final Map<String, byte[]> contents;
     private final Map<String, String> hashes;
     private final Instant takenAt;
 
     private WorkspaceSnapshot(String snapshotId, Path root,
-                             Map<String, String> contents, Map<String, String> hashes) {
+                             Map<String, byte[]> contents, Map<String, String> hashes) {
         this.snapshotId = snapshotId;
         this.root = root;
         this.contents = Map.copyOf(contents);
@@ -51,7 +54,10 @@ public class WorkspaceSnapshot {
     }
 
     public static WorkspaceSnapshot capture(String snapshotId, Path root) {
-        Map<String, String> contents = new HashMap<>();
+        // Bytes rather than text: a workspace legitimately contains binaries, and
+        // reading one as UTF-8 both corrupts it and throws. A snapshot that cannot
+        // represent every file is not a restore point.
+        Map<String, byte[]> contents = new HashMap<>();
         Map<String, String> hashes = new HashMap<>();
 
         if (!Files.exists(root)) {
@@ -71,9 +77,9 @@ public class WorkspaceSnapshot {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     String relative = root.relativize(file).toString();
-                    String content = Files.readString(file, StandardCharsets.UTF_8);
+                    byte[] content = Files.readAllBytes(file);
                     contents.put(relative, content);
-                    hashes.put(relative, FileChange.sha256(content));
+                    hashes.put(relative, sha256(content));
                     return FileVisitResult.CONTINUE;
                 }
 
@@ -133,10 +139,10 @@ public class WorkspaceSnapshot {
             }
 
             // Restore every file the snapshot knows about.
-            for (Map.Entry<String, String> entry : contents.entrySet()) {
+            for (Map.Entry<String, byte[]> entry : contents.entrySet()) {
                 Path target = root.resolve(entry.getKey());
                 Files.createDirectories(target.getParent());
-                Files.writeString(target, entry.getValue(), StandardCharsets.UTF_8);
+                Files.write(target, entry.getValue());
                 restored.add(entry.getKey());
             }
 
@@ -164,7 +170,7 @@ public class WorkspaceSnapshot {
                     mismatches.add(entry.getKey() + " (missing after restore)");
                     continue;
                 }
-                String actual = FileChange.sha256(Files.readString(file, StandardCharsets.UTF_8));
+                String actual = sha256(Files.readAllBytes(file));
                 if (!actual.equals(entry.getValue())) {
                     mismatches.add(entry.getKey() + " (content hash mismatch)");
                 }
@@ -177,6 +183,16 @@ public class WorkspaceSnapshot {
             throw new RollbackVerificationException(
                     "rollback verification failed for snapshot %s: %s"
                             .formatted(snapshotId, String.join(", ", mismatches)));
+        }
+    }
+
+    /** Content hash over raw bytes, so binaries hash as reliably as source files. */
+    private static String sha256(byte[] content) {
+        try {
+            return java.util.HexFormat.of().formatHex(
+                    java.security.MessageDigest.getInstance("SHA-256").digest(content));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
         }
     }
 
