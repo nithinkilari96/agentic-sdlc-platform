@@ -288,7 +288,7 @@ is a surprise in production.
   credential was available during development. What *is* verified: it compiles
   against the official `com.anthropic:anthropic-java` SDK, and the interface it
   implements is exercised continuously by every test in the suite. The adapter
-  itself is one class of about forty lines whose only job is to translate a
+  itself is a single class of roughly seventy lines whose only job is to translate a
   `ModelRequest` into a Messages API call — deliberately thin, so the unverified
   surface is small and isolated behind `ModelProvider`. Verify it with the
   command under [Verifying the live path](#verifying-the-live-path) before
