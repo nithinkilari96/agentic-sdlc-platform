@@ -10,16 +10,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up JDK 25
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           java-version: '25'
           distribution: 'corretto'
 
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -32,11 +32,18 @@ jobs:
       # scenarios that compile and test generated projects, is reproducible in CI
       # without an API key or a bill.
       - name: Build and test
+        # JDK 25 restricts native access (JEP 472) and Gradle's own native-platform
+        # library trips it. The warning says these calls will be blocked in a future
+        # release unless access is enabled, so this is what it asks for rather than
+        # a way to hide it. Applies to the launcher JVM - org.gradle.jvmargs does
+        # not, since that configures the daemon.
+        env:
+          JAVA_OPTS: --enable-native-access=ALL-UNNAMED
         run: ./gradlew build --no-daemon
 
       - name: Publish test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-results
           path: build/reports/tests/test

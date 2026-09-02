@@ -295,8 +295,15 @@ Honest about the order these matter in:
 
 1. **Distributed workflow ownership.** Multiple replicas need leasing before they
    can share a queue — Postgres advisory locks or row-level leases as the
-   incremental step, Temporal if durable execution is wanted wholesale. The
-   `@Version` column exists so this is an addition rather than a rewrite.
+   incremental step, Temporal if durable execution is wanted wholesale.
+
+   Two seams already exist for this, which is why it is an addition rather than a
+   rewrite. The `@Version` column on the checkpoint entity makes a concurrent
+   write from a second replica fail loudly instead of silently winning. And
+   `WorkflowEngine.drive()` takes a run and does not care who called it — it has
+   no notion of an HTTP request, a queue or a scheduler — so the thing that
+   decides *when* a run advances can be replaced without touching the thing that
+   decides *how*.
 2. **Postgres instead of H2.** Behind the `WorkflowStore` interface already.
 3. **Real identity.** Replace header roles with the identity provider, keeping
    the operator/approver split.

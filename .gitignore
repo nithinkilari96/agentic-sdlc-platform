@@ -33,3 +33,6 @@ run-artifacts/
 data/
 *.mv.db
 *.trace.db
+
+# Private working notes, never part of the submission
+INTERVIEW-NOTES.md
