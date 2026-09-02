@@ -12,11 +12,12 @@ bin/
 # Gradle
 .gradle/
 
-# IDE
+# IDE / local tooling
 .idea/
 *.iml
 *.iws
 .vscode/
+.claude/settings.local.json
 
 # OS
 .DS_Store
