@@ -112,7 +112,7 @@ Requires **JDK 25**. Nothing else — the Gradle wrapper is vendored.
 
 ```bash
 ./gradlew bootRun            # starts on :8080
-./gradlew test               # 46 tests, including real builds in sandboxed workspaces
+./gradlew test               # includes real builds in sandboxed workspaces
 ```
 
 **No API key is needed.** The platform ships a deterministic model provider, so
@@ -200,9 +200,9 @@ carry an instruction.
 | Plan integrity | `WorkflowPlanner` | A model-authored graph — so injection cannot emit a plan with no approval step |
 | Capability allow-list | `AgentType` | Agents the platform does not already know how to authorize and audit |
 
-17 tests attack these directly (`GuardrailTest`), including the case that must
-*not* be blocked: a `..` that normalises back inside the workspace is fine,
-because the control is containment, not pattern matching.
+`GuardrailTest` attacks these directly, including the case that must *not* be
+blocked: a `..` that normalises back inside the workspace is fine, because the
+control is containment, not pattern matching.
 
 ---
 
@@ -223,20 +223,20 @@ specific instrument:
 
 ## Testing approach
 
-46 tests, in three layers:
+Three layers:
 
-**Unit — orchestration logic** (`WorkflowGraphTest`, 14). Cycle rejection,
-parallel readiness, join synchronisation, bounded retries, transitive blocking,
-graph reshaping. Fast and deterministic.
+**Unit — orchestration logic** (`WorkflowGraphTest`). Cycle rejection, parallel
+readiness, join synchronisation, bounded retries, transitive blocking, graph
+reshaping. Fast and deterministic.
 
-**Adversarial — guardrails** (`GuardrailTest`, 17). Described above.
+**Adversarial — guardrails** (`GuardrailTest`). Described above.
 
 **Integration — the real thing** (`ScenarioIT`, `RepairLoopIT`,
-`CrashRecoveryIT`, `GeneratedProjectBuildsIT`, 12). Real workspaces, real Gradle
+`CrashRecoveryIT`, `GeneratedProjectBuildsIT`). Real workspaces, real Gradle
 builds, real subprocess execution. `GeneratedProjectBuildsIT` proves the
-generated URL shortener actually compiles and passes its own 12 tests rather
-than merely looking plausible; `RepairLoopIT` drives a genuinely failing
-compile through rollback, re-planning and recovery.
+generated URL shortener actually compiles and passes its own tests rather than
+merely looking plausible; `RepairLoopIT` drives a genuinely failing compile
+through rollback, re-planning and recovery.
 
 These tests earned their keep — they found four real bugs during development:
 snapshots reading binary files as UTF-8, scenario selection matching the

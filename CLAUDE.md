@@ -6,7 +6,7 @@ Conventions and context for anyone contributing here, human or AI assistant.
 
 ```bash
 ./gradlew build              # compile + all tests
-./gradlew test               # 41 tests
+./gradlew test               # unit + integration
 ./gradlew bootRun            # start on :8080
 ```
 
@@ -17,6 +17,10 @@ rely on a system `gradle`, which may be too old to run JDK 25.
 Integration tests run real Gradle builds in temporary workspaces and take
 30–60s. That is expected — they are the tests that prove generated code actually
 compiles.
+
+Do not quote test counts in documentation. They go stale the moment anyone adds
+a test, and a number nobody maintains is worse than no number. Name the suites
+and what they cover instead.
 
 ## Architectural invariants
 
