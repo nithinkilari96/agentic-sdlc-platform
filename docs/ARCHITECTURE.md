@@ -54,7 +54,49 @@ so a re-planning pass cannot produce a graph that deadlocks at runtime.
 
 ---
 
-## 3. Re-planning is not retrying
+## 3. Orchestration, not choreography
+
+A central coordinator owns the graph and decides what runs next. The alternative
+— event choreography, where each stage consumes from a topic and publishes the
+next event with no coordinator — is a well-established pattern and would have
+scaled better.
+
+**Why a coordinator.** Every governance property the brief asks for is a
+statement about the *whole* run: an explicit dependency graph with entry and exit
+gates, human approval before high-impact actions, bounded retries, safe-stop,
+rollback. In choreography those guarantees are distributed across every consumer,
+and each one has to independently not violate them. "No approval gate can be
+bypassed" becomes a property you hope holds across eight services rather than one
+you can check.
+
+With a coordinator, the same claim is verifiable by reading `WorkflowEngine` and
+`WorkflowPlanner`. When a re-plan inserts a repair round, one place decides that
+the superseded approval gate must not fire; in a choreographed version, a stale
+consumer holding an in-flight message could still deliver it. That is a subtle
+bug with a serious consequence — a human approving a build that failed.
+
+**Rejected: Kafka or JMS choreography.** Better throughput, better failure
+isolation, and genuinely the right answer for a high-volume pipeline. But it
+trades away the property this system exists to demonstrate: that the boundary
+between what the model proposes and what the platform permits is small enough to
+audit. It also moves ordering into broker semantics — partition keys, redelivery,
+consumer-group rebalancing — which is a great deal of machinery to reason about
+before you can answer "could this run have skipped its approval step?"
+
+**What we gave up, and where it hurts.** Throughput is bounded by one process,
+and horizontal scale needs distributed workflow ownership before a second replica
+can safely exist. That is a real limitation, documented as such. The mitigation
+is that the boundary is already drawn correctly: `drive()` takes a run and does
+not care who called it, so moving execution behind a queue is an addition rather
+than a redesign. The `@Version` column on the checkpoint entity exists for the
+same reason.
+
+The honest summary: choreography scales better, orchestration is *provable*, and
+this assignment is about governed autonomy rather than throughput.
+
+---
+
+## 4. Re-planning is not retrying
 
 When validation fails, the platform does not re-run the failed node. It bumps the
 context revision, rolls the workspace back to its verified snapshot, and replaces
@@ -86,7 +128,7 @@ unbounded bill.
 
 ---
 
-## 4. Context revisions make staleness detectable
+## 5. Context revisions make staleness detectable
 
 Agents never mutate each other's outputs. They publish artifacts at the current
 revision. When new information arrives that invalidates earlier assumptions — a
@@ -102,7 +144,7 @@ arrives there is no way to tell which prior conclusions it invalidated.
 
 ---
 
-## 5. Approval sits after validation, not before every step
+## 6. Approval sits after validation, not before every step
 
 The human gate is a single checkpoint, placed once executable evidence exists.
 
@@ -121,7 +163,7 @@ ceremonial.
 
 ---
 
-## 6. Ambiguity stops the system
+## 7. Ambiguity stops the system
 
 `RequirementAgent` scores its own confidence. The *platform* compares that score
 to a threshold it owns (0.60) and parks the run below it.
@@ -142,7 +184,7 @@ abandoned.
 
 ---
 
-## 7. One executable capability, and it takes no parameters
+## 8. One executable capability, and it takes no parameters
 
 `BuildValidator` runs a fixed command in the workspace. The model supplies no
 command, no arguments, no working directory — because none of those are
@@ -160,7 +202,7 @@ and the end of the log is where failures are described.
 
 ---
 
-## 8. One component writes to disk
+## 9. One component writes to disk
 
 `PatchApplier` is the only code in the platform that writes agent-authored
 content.
@@ -180,7 +222,7 @@ hash either lands completely or is refused.
 
 ---
 
-## 9. Rollback is verified, not asserted
+## 10. Rollback is verified, not asserted
 
 `WorkspaceSnapshot` re-hashes every file after a restore and raises if anything
 mismatches.
@@ -209,7 +251,7 @@ submitted code, and confirmed with failing tests before being fixed.)*
 
 ---
 
-## 10. Durable state, and a task that was running is not assumed finished
+## 11. Durable state, and a task that was running is not assumed finished
 
 State is checkpointed after every batch of tasks. On startup, interrupted runs
 are rehydrated and resumed.
@@ -229,7 +271,7 @@ restart is not an answer.
 
 ---
 
-## 11. The model seam is three methods
+## 12. The model seam is three methods
 
 `ModelProvider` has `name()`, `isLive()` and `complete()`. Everything above it is
 deterministic Java that behaves identically whichever implementation is wired in.

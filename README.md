@@ -194,6 +194,116 @@ Generated code lands in `workspaces/{workflowId}/`.
 
 ---
 
+## Worked example
+
+Captured from a running instance, not written by hand.
+
+### Ambiguity stops the system, and the answer reshapes the plan
+
+`POST /api/v1/workflows` with `"Improve analytics"` — deliberately under-specified:
+
+```
+state: AWAITING_CLARIFICATION   tasks: 1   revision: 0
+questions:
+  - Which dimension should analytics break down by — time, geography, referrer, or device?
+  - Is this about collecting data the service does not yet capture, or presenting data it already has?
+  - Should historical clicks be backfilled, or does the new breakdown start from deployment?
+  - Is per-link granularity sufficient, or is an account-level roll-up needed?
+```
+
+Nothing was designed, generated or written. The graph is one node:
+
+```
+requirement              AWAITING_HUMAN <- (root)
+```
+
+After `POST /{id}/clarify` with *"Break clicks down by country using the
+X-Client-Country header, on a new per-link analytics endpoint"*:
+
+```
+state: AWAITING_APPROVAL   tasks: 10   revision: 1
+
+requirement              AWAITING_HUMAN <- (root)
+requirement-clarified    SUCCEEDED      <- (root)
+repository-analysis      SUCCEEDED      <- requirement-clarified
+architecture             SUCCEEDED      <- repository-analysis
+implementation           SUCCEEDED      <- architecture
+tests                    SUCCEEDED      <- implementation
+documentation            SUCCEEDED      <- implementation
+patch-apply              SUCCEEDED      <- tests, documentation
+validate                 SUCCEEDED      <- patch-apply
+release-readiness        AWAITING_HUMAN <- validate
+```
+
+One task became ten and the revision advanced. The original `requirement` node
+stays `AWAITING_HUMAN` rather than being rewritten — it genuinely did stop, and
+the lineage should say so.
+
+### A failing build re-plans rather than retries
+
+A run whose first implementation does not compile:
+
+```
+final state: AWAITING_APPROVAL
+repair rounds: 1   rollbacks: 1   revision: 1
+
+...
+validate                 SUCCEEDED      <- patch-apply
+release-readiness        SUPERSEDED     <- validate
+repair-1                 SUCCEEDED      <- (root)
+patch-apply-1            SUCCEEDED      <- repair-1
+validate-1               SUCCEEDED      <- patch-apply-1
+release-readiness-1      AWAITING_HUMAN <- validate-1
+```
+
+The graph changed shape. `validate` stays `SUCCEEDED` — it ran the build and
+returned a truthful answer, so the *task* succeeded; the *change* is what failed.
+The approval gate hanging off it is superseded, which is the load-bearing part:
+without that, a human would be asked to approve a build that failed.
+
+The lineage records the sequence:
+
+```
+[ORCHESTRATOR] VALIDATION_RESULT      rev0  Build failed (exit 1)
+[ORCHESTRATOR] ROLLBACK_PERFORMED     rev0  restoring workspace before repair round 1:
+                                            restored 1 files, removed 15 (verified)
+[ORCHESTRATOR] PLAN_REVISED           rev1  validation failed; repair round 1 planned
+                                            from build evidence
+[ORCHESTRATOR] PLAN_REVISED           rev1  added [repair-1, patch-apply-1, validate-1,
+                                            release-readiness-1]
+[ORCHESTRATOR] APPROVAL_REQUESTED     rev1  Change is ready for review.
+```
+
+Note the rollback happens *before* the repair, and its restore is verified.
+
+### Governance is enforced, not documented
+
+```
+OPERATOR approving their own run   -> 403  this action requires the APPROVER role,
+                                           but the caller is OPERATOR
+no X-Role header at all            -> 403  no role supplied; set the X-Role header
+APPROVER approving                 -> COMPLETED
+```
+
+### The five reliability metrics, populated
+
+From `/actuator/prometheus` after the runs above:
+
+```
+workflow_outcome_total{state="COMPLETED",succeeded="true"}  1.0
+workflow_duration_seconds_sum{state="COMPLETED"}           19.555
+workflow_mttr_seconds_sum                                  11.117
+workspace_rollback_total                                    1.0
+validation_failure_total                                    1.0
+workflow_clarification_total                                1.0
+```
+
+The MTTR of 11.1s is real: measured from the first validation failure to the run
+reaching a good terminal state — not from process start, and not recorded for
+runs that never broke.
+
+---
+
 ## Guardrails
 
 Every control assumes agent output is hostile — not from distrust of the model,
