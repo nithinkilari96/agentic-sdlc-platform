@@ -283,23 +283,37 @@ identical `ModelProvider` interface. The orchestrator cannot tell them apart.
 Stated plainly, because a documented gap is a known risk and an undocumented one
 is a surprise in production.
 
-- **Single-process orchestration.** State is durable and crash-recoverable, but
-  there is no distributed workflow ownership. Running multiple replicas needs
-  leasing — Postgres advisory locks, or a durable workflow engine like Temporal.
-  The `@Version` column on the checkpoint entity is in place for this reason.
-- **H2 file storage.** Correct for a prototype and genuinely durable across
-  restarts. Production would use Postgres; the store is behind an interface.
+- **Single-process orchestration.** State is durable and crash-recoverable, and
+  human decisions are serialised per workflow, but there is no distributed
+  workflow ownership. Running multiple replicas needs leasing — Postgres
+  advisory locks, or a durable workflow engine like Temporal. The `@Version`
+  column on the checkpoint entity is in place for this reason.
+- **Workflow start is synchronous.** `POST /api/v1/workflows` blocks until the
+  run settles or parks, which for a greenfield build means holding the
+  connection through a real Gradle build. Production would return `202` with a
+  location header and execute on a queue; the engine is already structured for
+  it, since `drive()` takes a run and does not care who called it.
+- **H2 file storage.** Genuinely durable across restarts, which is what the
+  recovery tests exercise. Production would use Postgres; the store is behind an
+  interface.
 - **Role checks are header-based.** A prototype boundary, not authentication.
   What it establishes is that the two capabilities are *distinct by design*; a
   real deployment substitutes the identity provider and keeps the distinction.
+- **The repository digest is capped** at 40 files and 4KB each. Enough for the
+  agent to infer conventions from a service of this size, and a hard limit on
+  prompt cost — but a large repository is only partly seen. Selecting the
+  relevant subset, rather than the first N alphabetically, is the next step.
+- **No model-provider fallback.** If the live provider fails, the task fails and
+  the retry budget applies. There is no automatic downgrade to a second model.
 - **Whole-file replacement, not diffs.** Fuzzy patch application against
   model-authored hunks fails in ways that are hard to detect and easy to
   half-apply. Whole-file writes guarded by an optimistic lock either land
   completely or are refused. The cost is token usage on large files.
+- **No Docker image or OpenAPI schema.** The build needs only a JDK and the
+  vendored wrapper, and the API surface is small enough to read from the
+  controller, so neither was worth the time against the deliverables.
 - **The generated shortener stores mappings in memory.** It is the workload, not
   the deliverable; its own limitations are documented in its README.
-
----
 
 ## Layout
 
