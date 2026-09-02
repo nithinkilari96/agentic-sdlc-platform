@@ -126,7 +126,16 @@ public class BuildValidator {
         }
     }
 
-    private void stripCredentials(Map<String, String> environment) {
+    /**
+     * Removes anything credential-shaped from the environment the build inherits.
+     *
+     * <p>Package-private and static so it can be tested directly against a
+     * synthetic environment. Verifying this through a real subprocess would mean
+     * injecting a fake secret into the JVM's own environment, which is not
+     * possible from inside the test — and a security control that cannot be
+     * tested tends to become a security control that does not work.
+     */
+    static void stripCredentials(Map<String, String> environment) {
         environment.keySet().removeIf(key -> {
             String upper = key.toUpperCase(Locale.ROOT);
             return CREDENTIAL_PREFIXES.stream().anyMatch(upper::contains);
