@@ -111,7 +111,7 @@ Requires **JDK 25**. Nothing else — the Gradle wrapper is vendored.
 
 ```bash
 ./gradlew bootRun            # starts on :8080
-./gradlew test               # 41 tests, including real builds in sandboxed workspaces
+./gradlew test               # 46 tests, including real builds in sandboxed workspaces
 ```
 
 **No API key is needed.** The platform ships a deterministic model provider, so
@@ -143,7 +143,16 @@ curl -sX POST localhost:8080/api/v1/workflows \
 curl -sX POST localhost:8080/api/v1/workflows \
   -H 'Content-Type: application/json' -H 'X-Role: OPERATOR' \
   -d '{"requirement":"Improve analytics","brownfield":true,"expectAmbiguity":true}'
+
+# 4. Repair loop — first build genuinely fails, system re-plans and recovers
+curl -sX POST localhost:8080/api/v1/workflows \
+  -H 'Content-Type: application/json' -H 'X-Role: OPERATOR' \
+  -d '{"requirement":"Build a URL shortener with a click counter, using a seeded compile failure to exercise the repair path."}'
 ```
+
+The fourth is worth watching on `/graph`: the plan gains `repair-1`,
+`patch-apply-1`, `validate-1` and `release-readiness-1`, and the original
+approval gate is superseded — so no human is ever shown the failed build.
 
 Then inspect and act:
 
@@ -213,7 +222,7 @@ specific instrument:
 
 ## Testing approach
 
-41 tests, in three layers:
+46 tests, in three layers:
 
 **Unit — orchestration logic** (`WorkflowGraphTest`, 14). Cycle rejection,
 parallel readiness, join synchronisation, bounded retries, transitive blocking,
@@ -221,16 +230,18 @@ graph reshaping. Fast and deterministic.
 
 **Adversarial — guardrails** (`GuardrailTest`, 17). Described above.
 
-**Integration — the real thing** (`ScenarioIT`, `CrashRecoveryIT`,
-`GeneratedProjectBuildsIT`, 10). Real workspaces, real Gradle builds, real
-subprocess execution. `GeneratedProjectBuildsIT` is the one that matters most:
-it proves the generated URL shortener actually compiles and passes its own 12
-tests, rather than merely looking plausible.
+**Integration — the real thing** (`ScenarioIT`, `RepairLoopIT`,
+`CrashRecoveryIT`, `GeneratedProjectBuildsIT`, 12). Real workspaces, real Gradle
+builds, real subprocess execution. `GeneratedProjectBuildsIT` proves the
+generated URL shortener actually compiles and passes its own 12 tests rather
+than merely looking plausible; `RepairLoopIT` drives a genuinely failing
+compile through rollback, re-planning and recovery.
 
-These tests earned their keep — they found three real bugs during development:
+These tests earned their keep — they found four real bugs during development:
 snapshots reading binary files as UTF-8, scenario selection matching the
-accumulated prompt rather than the requirement, and path policy rooted at the
-shared workspaces directory instead of per run.
+accumulated prompt rather than the requirement, path policy rooted at the shared
+workspaces directory instead of per run, and a greenfield workspace reading as an
+existing codebase because the installed build wrapper was in the digest.
 
 ### Deterministic vs live provider
 
