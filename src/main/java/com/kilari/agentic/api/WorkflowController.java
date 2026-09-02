@@ -29,6 +29,11 @@ import java.util.Map;
  * and approving its output require different roles. An operator who could also
  * approve their own run would make the approval gate ceremonial — the whole
  * point is that a second party looks at the evidence.
+ *
+ * <p>{@code X-Role} is required on every state-changing call and has no default.
+ * A default would mean a caller who sent no role at all was silently granted
+ * one, which is the wrong direction for a header that exists to restrict what
+ * someone may do. A missing role is a refusal, not an assumption.
  */
 @RestController
 @RequestMapping("/api/v1/workflows")
@@ -42,8 +47,7 @@ public class WorkflowController {
 
     @PostMapping
     public ResponseEntity<WorkflowSummary> start(@RequestBody StartRequest request,
-                                                 @RequestHeader(value = "X-Role", defaultValue = "OPERATOR")
-                                                 String role) {
+                                                 @RequestHeader("X-Role") String role) {
         Role.require(role, Role.OPERATOR);
 
         WorkflowRun run = service.start(
@@ -89,8 +93,7 @@ public class WorkflowController {
     @PostMapping("/{workflowId}/clarify")
     public ResponseEntity<WorkflowSummary> clarify(@PathVariable String workflowId,
                                                    @RequestBody ClarifyRequest request,
-                                                   @RequestHeader(value = "X-Role", defaultValue = "OPERATOR")
-                                                   String role) {
+                                                   @RequestHeader("X-Role") String role) {
         Role.require(role, Role.OPERATOR);
         service.clarify(workflowId, request.clarification());
         return status(workflowId);
@@ -119,6 +122,18 @@ public class WorkflowController {
     @ExceptionHandler(Role.ForbiddenException.class)
     public ResponseEntity<Map<String, String>> handleForbidden(Role.ForbiddenException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+    }
+
+    /**
+     * A missing X-Role is a refused request, not a malformed one. Reporting it as
+     * 400 would send a caller looking at their payload for a problem that is
+     * actually about authorisation.
+     */
+    @ExceptionHandler(org.springframework.web.bind.MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String, String>> handleMissingRole(
+            org.springframework.web.bind.MissingRequestHeaderException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("error", "required header missing: " + e.getHeaderName()));
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

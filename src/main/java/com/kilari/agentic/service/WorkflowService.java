@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Application-level entry point for running workflows.
@@ -50,6 +51,22 @@ public class WorkflowService {
      * database.
      */
     private final Map<String, WorkflowRun> active = new ConcurrentHashMap<>();
+
+    /**
+     * One lock per workflow, guarding human decisions.
+     *
+     * <p>The engine checks a run's state and then transitions it. Without a lock
+     * those are two steps, so two approvers clicking at once — or an approve
+     * racing a reject — can both pass the check and both act. The second one
+     * would either double-transition a completed run or roll back a change that
+     * was just approved.
+     *
+     * <p>Per workflow rather than global: decisions on unrelated runs have no
+     * reason to queue behind each other. This is correct within one process;
+     * across replicas it would need a lease in the database, which is the same
+     * gap as distributed workflow ownership generally.
+     */
+    private final Map<String, ReentrantLock> decisionLocks = new ConcurrentHashMap<>();
 
     public WorkflowService(WorkflowEngine engine, WorkflowStore store,
                            WorkspaceFactory workspaces, WorkflowMetrics metrics) {
@@ -110,16 +127,33 @@ public class WorkflowService {
     }
 
     public void clarify(String workflowId, String clarification) {
-        WorkflowRun run = require(workflowId);
-        engine.resumeWithClarification(run, clarification);
+        withDecisionLock(workflowId, run -> engine.resumeWithClarification(run, clarification));
     }
 
     public void approve(String workflowId, String approver, String comment) {
-        engine.approve(require(workflowId), approver, comment);
+        withDecisionLock(workflowId, run -> engine.approve(run, approver, comment));
     }
 
     public void reject(String workflowId, String approver, String reason) {
-        engine.reject(require(workflowId), approver, reason);
+        withDecisionLock(workflowId, run -> engine.reject(run, approver, reason));
+    }
+
+    /**
+     * Serialises human decisions on one workflow.
+     *
+     * <p>The state check inside the engine happens under this lock, so a second
+     * caller arriving concurrently finds the run already transitioned and is
+     * rejected by the same guard that would have rejected it a second later.
+     * The loser gets a clear conflict rather than a silent double action.
+     */
+    private void withDecisionLock(String workflowId, java.util.function.Consumer<WorkflowRun> action) {
+        ReentrantLock lock = decisionLocks.computeIfAbsent(workflowId, id -> new ReentrantLock());
+        lock.lock();
+        try {
+            action.accept(require(workflowId));
+        } finally {
+            lock.unlock();
+        }
     }
 
     public Optional<WorkflowRun> find(String workflowId) {
