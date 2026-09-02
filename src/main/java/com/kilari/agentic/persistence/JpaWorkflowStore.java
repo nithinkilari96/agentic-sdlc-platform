@@ -135,6 +135,16 @@ public class JpaWorkflowStore implements WorkflowStore {
             run.recordApprover(entity.getApprover());
         }
 
+        // Counters and timing are part of the aggregate, not decoration. Skipping
+        // them resets the repair budget and restarts the latency clock.
+        RecoverySupport.restoreExecutionState(run,
+                entity.getRepairRounds(),
+                entity.getRollbackCount(),
+                entity.getRetryCount(),
+                entity.getStartedAt(),
+                entity.getFirstFailureAt(),
+                entity.getFinishedAt());
+
         restoreContext(run.context(), entity);
         run.transitionTo(WorkflowState.valueOf(entity.getState()), entity.getTerminalReason());
 

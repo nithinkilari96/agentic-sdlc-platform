@@ -25,6 +25,21 @@ public final class RecoverySupport {
         node.restore(state, attempts, lastFailureReason, startedAt, finishedAt);
     }
 
+    /**
+     * Restores a run's execution counters and timing.
+     *
+     * <p>Without this, a rehydrated run reports zero repairs, zero rollbacks and
+     * a start time of "now" — which silently resets the repair budget and makes
+     * latency and MTTR meaningless after any restart.
+     */
+    public static void restoreExecutionState(WorkflowRun run, int repairRounds, int rollbackCount,
+                                             int retryCount, java.time.Instant startedAt,
+                                             java.time.Instant firstFailureAt,
+                                             java.time.Instant finishedAt) {
+        run.restoreExecutionState(repairRounds, rollbackCount, retryCount,
+                startedAt, firstFailureAt, finishedAt);
+    }
+
     /** Restores persisted context: revision, artifacts and the audit lineage. */
     public static void restoreContext(WorkflowContext context, int revision,
                                       Map<String, Artifact> artifacts, List<DecisionRecord> lineage) {

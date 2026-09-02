@@ -7,6 +7,7 @@ import com.kilari.agentic.orchestration.RecoverySupport;
 import com.kilari.agentic.orchestration.TaskNode;
 import com.kilari.agentic.orchestration.TaskState;
 import com.kilari.agentic.orchestration.WorkflowGraph;
+import com.kilari.agentic.orchestration.WorkflowPlanner;
 import com.kilari.agentic.orchestration.WorkflowRun;
 import com.kilari.agentic.orchestration.WorkflowState;
 import com.kilari.agentic.service.WorkflowService;
@@ -51,7 +52,7 @@ class CrashRecoveryIT {
     void parked_run_survives_process_loss() {
         WorkflowRun original = workflows.start(
                 "Build a URL shortener service with create, resolve and stats APIs.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
 
         assertThat(original.state()).isEqualTo(WorkflowState.AWAITING_APPROVAL);
         int originalLineageSize = original.context().lineage().size();
@@ -93,7 +94,7 @@ class CrashRecoveryIT {
     void recovered_run_remains_actionable() {
         WorkflowRun original = workflows.start(
                 "Build a URL shortener service with create and resolve APIs.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
         assertThat(original.state()).isEqualTo(WorkflowState.AWAITING_APPROVAL);
 
         WorkflowRun recovered = store.load(original.workflowId()).orElseThrow();
@@ -151,10 +152,47 @@ class CrashRecoveryIT {
     }
 
     @Test
+    @DisplayName("execution counters and timing survive the restart, not just the graph")
+    void counters_and_timing_are_restored() {
+        WorkflowGraph graph = new WorkflowGraph(List.of(
+                new TaskNode("requirement", AgentType.REQUIREMENT, Set.of(), 2, 0)));
+        WorkflowRun original = new WorkflowRun("wf-counters", "some requirement", graph,
+                Path.of("build/test-workspaces-recovery/wf-counters"));
+
+        original.nextRepairRound();
+        original.recordRollback();
+        original.recordRetry();
+        original.recordRetry();
+        original.recordFailureMoment();
+        original.transitionTo(WorkflowState.RUNNING, "mid-flight");
+        store.checkpoint(original);
+
+        WorkflowRun recovered = store.load("wf-counters").orElseThrow();
+
+        // The repair budget is the important one. If it resets, a run that keeps
+        // crashing gets a fresh allowance every restart and the bound stops
+        // bounding anything.
+        assertThat(recovered.repairRounds())
+                .as("repair budget must not reset across a restart")
+                .isEqualTo(original.repairRounds());
+        assertThat(recovered.rollbackCount()).isEqualTo(original.rollbackCount());
+        assertThat(recovered.retryCount()).isEqualTo(original.retryCount());
+
+        // Timing drives end-to-end latency and MTTR. Restarting must not make a
+        // long-running workflow look like it just began.
+        assertThat(recovered.startedAt())
+                .as("start time must survive, or latency is measured from the restart")
+                .isEqualTo(original.startedAt());
+        assertThat(recovered.firstFailureAt())
+                .as("MTTR is measured from the first failure; losing it loses the metric")
+                .isEqualTo(original.firstFailureAt());
+    }
+
+    @Test
     @DisplayName("interrupted runs are discoverable at startup; parked ones are left for their human")
     void resumable_runs_are_identified() {
         WorkflowRun parked = workflows.start(
-                "Build a URL shortener service with stats APIs.", false, false);
+                "Build a URL shortener service with stats APIs.", false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
         assertThat(parked.state()).isEqualTo(WorkflowState.AWAITING_APPROVAL);
 
         assertThat(store.findResumable())

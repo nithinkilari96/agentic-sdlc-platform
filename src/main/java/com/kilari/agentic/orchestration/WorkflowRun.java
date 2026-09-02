@@ -25,7 +25,13 @@ public class WorkflowRun {
     private final WorkflowGraph graph;
     private final WorkflowContext context;
     private final Path workspace;
-    private final Instant startedAt;
+
+    /**
+     * Not final: recovery has to restore the original start time. A rehydrated
+     * run that reports the restart as its beginning would make end-to-end
+     * latency measure how long ago the pod came up.
+     */
+    private volatile Instant startedAt;
 
     private final Map<String, WorkspaceSnapshot> snapshots = new ConcurrentHashMap<>();
     private final AtomicInteger repairRounds = new AtomicInteger();
@@ -138,6 +144,25 @@ public class WorkflowRun {
         if (firstFailureAt == null) {
             firstFailureAt = Instant.now();
         }
+    }
+
+    /**
+     * Restores execution counters and timing after a crash.
+     *
+     * <p>The repair count is the one that matters most. If it resets, a workflow
+     * that keeps dying mid-repair gets a fresh budget on every restart, and a
+     * bound that resets is not a bound.
+     */
+    void restoreExecutionState(int repairRounds, int rollbackCount, int retryCount,
+                               Instant startedAt, Instant firstFailureAt, Instant finishedAt) {
+        this.repairRounds.set(repairRounds);
+        this.rollbackCount.set(rollbackCount);
+        this.retryCount.set(retryCount);
+        if (startedAt != null) {
+            this.startedAt = startedAt;
+        }
+        this.firstFailureAt = firstFailureAt;
+        this.finishedAt = finishedAt;
     }
 
     public int repairRounds() {
