@@ -210,10 +210,12 @@ carry an instruction.
 | Single write choke point | `PatchApplier` | Every other route to the filesystem — there is one method to audit |
 | Optimistic locking | `PatchApplier` | Overwriting a file that changed since the agent read it |
 | Verified rollback | `WorkspaceSnapshot` | A restore that did not fully land — every file is re-hashed afterwards |
+| Durable rollback | `SnapshotStore` | Losing the restore point with the process — snapshots are on disk before the mutation, so an interrupted patch is restored rather than re-baselined |
 | Fixed executable capability | `BuildValidator` | Model-supplied commands, arguments or working directories — they are not parameters |
 | Credential stripping | `BuildValidator` | The build inheriting anything credential-shaped |
 | Entry gate | `PolicyGuard` | Runs exceeding the wall-clock ceiling or growing past the task limit |
-| Separation of duties | `Role` | An operator approving their own run |
+| Separation of duties | `Role` | An operator approving their own run, and any caller who sends no role at all — the header is required, with no default |
+| Serialised decisions | `WorkflowService` | Two approvers, or an approve racing a reject, both taking effect on one run |
 | Plan integrity | `WorkflowPlanner` | A model-authored graph — so injection cannot emit a plan with no approval step |
 | Capability allow-list | `AgentType` | Agents the platform does not already know how to authorize and audit |
 

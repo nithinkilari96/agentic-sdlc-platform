@@ -194,6 +194,19 @@ reading one as UTF-8 both corrupts it and throws — a snapshot that cannot
 represent every file is not a restore point. *(This was found by a test, not by
 inspection.)*
 
+They are also written to disk before the mutation happens, outside the workspace
+they describe. An in-memory-only snapshot means a crash after a patch lands
+leaves the next process with a modified workspace and no record of the original.
+The dangerous part is not the missing rollback: re-running the interrupted task
+would capture the already-modified tree as its new baseline, so a later rollback
+would faithfully restore the broken state **and report success**. A safety
+control that silently lies is worse than an absent one. The manifest is written
+last, so an interrupted write reads as absent rather than partial, and content is
+verified against its hash on load so a corrupt backup is refused.
+
+*(Both this and the lost recovery counters were raised by a review of the
+submitted code, and confirmed with failing tests before being fixed.)*
+
 ---
 
 ## 10. Durable state, and a task that was running is not assumed finished
