@@ -9,6 +9,7 @@ import com.kilari.agentic.orchestration.DecisionRecord;
 import com.kilari.agentic.orchestration.RecoverySupport;
 import com.kilari.agentic.orchestration.TaskNode;
 import com.kilari.agentic.orchestration.TaskState;
+import com.kilari.agentic.orchestration.Timestamps;
 import com.kilari.agentic.orchestration.WorkflowContext;
 import com.kilari.agentic.orchestration.WorkflowGraph;
 import com.kilari.agentic.orchestration.WorkflowRun;
@@ -76,7 +77,7 @@ public class JpaWorkflowStore implements WorkflowStore {
         entity.setStartedAt(run.startedAt());
         entity.setFirstFailureAt(run.firstFailureAt().orElse(null));
         entity.setFinishedAt(run.finishedAt().orElse(null));
-        entity.setCheckpointedAt(Instant.now());
+        entity.setCheckpointedAt(Timestamps.now());
 
         checkpoints.save(entity);
         appendNewDecisions(run);

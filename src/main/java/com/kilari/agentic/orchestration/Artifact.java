@@ -31,7 +31,7 @@ public record Artifact(
     }
 
     public static Artifact of(String key, AgentType producedBy, String taskId, int revision, String content) {
-        return new Artifact(key, producedBy, taskId, revision, content, Instant.now());
+        return new Artifact(key, producedBy, taskId, revision, content, Timestamps.now());
     }
 
     /** True when this artifact was derived from an older view of the world. */

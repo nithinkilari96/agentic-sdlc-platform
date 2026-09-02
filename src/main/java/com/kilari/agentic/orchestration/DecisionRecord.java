@@ -66,11 +66,11 @@ public record DecisionRecord(
 
     public static DecisionRecord of(String workflowId, String taskId, Actor actor,
                                     DecisionType type, int contextRevision, String summary) {
-        return new DecisionRecord(workflowId, taskId, actor, type, contextRevision, summary, Map.of(), Instant.now());
+        return new DecisionRecord(workflowId, taskId, actor, type, contextRevision, summary, Map.of(), Timestamps.now());
     }
 
     public static DecisionRecord of(String workflowId, String taskId, Actor actor, DecisionType type,
                                     int contextRevision, String summary, Map<String, String> evidence) {
-        return new DecisionRecord(workflowId, taskId, actor, type, contextRevision, summary, evidence, Instant.now());
+        return new DecisionRecord(workflowId, taskId, actor, type, contextRevision, summary, evidence, Timestamps.now());
     }
 }

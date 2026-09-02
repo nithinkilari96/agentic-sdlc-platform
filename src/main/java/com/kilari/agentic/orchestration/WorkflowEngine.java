@@ -455,7 +455,7 @@ public class WorkflowEngine {
                         String summary, Map<String, String> evidence) {
         run.context().record(new DecisionRecord(
                 run.workflowId(), taskId, actor, type,
-                run.context().revision(), summary, evidence, java.time.Instant.now()));
+                run.context().revision(), summary, evidence, Timestamps.now()));
     }
 
     /** One task's result, successful or not. */

@@ -59,7 +59,7 @@ public class WorkflowRun {
         this.graph = graph;
         this.context = new WorkflowContext(workflowId);
         this.workspace = workspace;
-        this.startedAt = Instant.now();
+        this.startedAt = Timestamps.now();
     }
 
     public String workflowId() {
@@ -96,14 +96,14 @@ public class WorkflowRun {
 
     /** Wall-clock duration so far, which is the end-to-end latency metric. */
     public Duration elapsed() {
-        return Duration.between(startedAt, finishedAt == null ? Instant.now() : finishedAt);
+        return Duration.between(startedAt, finishedAt == null ? Timestamps.now() : finishedAt);
     }
 
     public void transitionTo(WorkflowState next, String reason) {
         this.state = next;
         this.terminalReason = reason;
         if (next.isTerminal()) {
-            this.finishedAt = Instant.now();
+            this.finishedAt = Timestamps.now();
         }
     }
 
@@ -142,7 +142,7 @@ public class WorkflowRun {
     /** Records the first failure only; later failures do not reset the MTTR clock. */
     public void recordFailureMoment() {
         if (firstFailureAt == null) {
-            firstFailureAt = Instant.now();
+            firstFailureAt = Timestamps.now();
         }
     }
 

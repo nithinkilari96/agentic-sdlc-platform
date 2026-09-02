@@ -104,13 +104,13 @@ public class TaskNode {
         this.state = TaskState.RUNNING;
         this.attempts++;
         if (this.startedAt == null) {
-            this.startedAt = Instant.now();
+            this.startedAt = Timestamps.now();
         }
     }
 
     void markSucceeded() {
         this.state = TaskState.SUCCEEDED;
-        this.finishedAt = Instant.now();
+        this.finishedAt = Timestamps.now();
     }
 
     /**
@@ -124,19 +124,19 @@ public class TaskNode {
             this.state = TaskState.FAILED;
         } else {
             this.state = TaskState.EXHAUSTED;
-            this.finishedAt = Instant.now();
+            this.finishedAt = Timestamps.now();
         }
     }
 
     void markBlocked(String reason) {
         this.lastFailureReason = reason;
         this.state = TaskState.BLOCKED;
-        this.finishedAt = Instant.now();
+        this.finishedAt = Timestamps.now();
     }
 
     void markSuperseded() {
         this.state = TaskState.SUPERSEDED;
-        this.finishedAt = Instant.now();
+        this.finishedAt = Timestamps.now();
     }
 
     void markAwaitingHuman() {
