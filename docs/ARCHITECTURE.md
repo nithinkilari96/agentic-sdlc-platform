@@ -238,16 +238,14 @@ differently. It is a test double, not a claim about reasoning.
 
 Honest about the order these matter in:
 
-1. **Smoke-test the live provider.** It compiles against the real SDK and the
-   code is straightforward, but unexecuted code is unverified code.
-2. **Distributed workflow ownership.** Multiple replicas need leasing before they
+1. **Distributed workflow ownership.** Multiple replicas need leasing before they
    can share a queue — Postgres advisory locks or row-level leases as the
    incremental step, Temporal if durable execution is wanted wholesale. The
    `@Version` column exists so this is an addition rather than a rewrite.
-3. **Postgres instead of H2.** Behind the `WorkflowStore` interface already.
-4. **Real identity.** Replace header roles with the identity provider, keeping
+2. **Postgres instead of H2.** Behind the `WorkflowStore` interface already.
+3. **Real identity.** Replace header roles with the identity provider, keeping
    the operator/approver split.
-5. **Richer re-planning triggers.** Today the graph reshapes on clarification and
+4. **Richer re-planning triggers.** Today the graph reshapes on clarification and
    on validation failure. Architecture review rejecting a design, or a
    dependency-scan finding, are natural additional triggers using the same
    revision machinery.
