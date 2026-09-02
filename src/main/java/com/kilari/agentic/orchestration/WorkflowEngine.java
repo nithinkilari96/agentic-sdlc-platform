@@ -6,12 +6,14 @@ import com.kilari.agentic.agent.AgentOutcome;
 import com.kilari.agentic.governance.PolicyGuard;
 import com.kilari.agentic.metrics.WorkflowMetrics;
 import com.kilari.agentic.persistence.WorkflowStore;
+import com.kilari.agentic.tools.SnapshotStore;
 import com.kilari.agentic.tools.WorkspaceSnapshot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -51,15 +53,18 @@ public class WorkflowEngine {
     private final WorkflowStore store;
     private final WorkflowMetrics metrics;
     private final PolicyGuard policyGuard;
+    private final SnapshotStore snapshots;
 
     public WorkflowEngine(Map<AgentType, Agent> agents,
                           WorkflowStore store,
                           WorkflowMetrics metrics,
-                          PolicyGuard policyGuard) {
+                          PolicyGuard policyGuard,
+                          SnapshotStore snapshots) {
         this.agents = Map.copyOf(agents);
         this.store = store;
         this.metrics = metrics;
         this.policyGuard = policyGuard;
+        this.snapshots = snapshots;
     }
 
     /** Runs until the graph settles or the workflow parks for a human. */
@@ -133,10 +138,34 @@ public class WorkflowEngine {
         // Taken here rather than inside the agent so the guarantee does not depend
         // on an agent implementation remembering to ask for it.
         if (node.agentType().mutatesWorkspace()) {
+            // A snapshot already on disk means this task was interrupted mid-flight
+            // by a crash. Re-capturing now would take the half-modified workspace as
+            // the new baseline, and a later rollback would faithfully restore the
+            // broken state while reporting success.
+            Optional<WorkspaceSnapshot> existing =
+                    snapshots.load(run.workflowId(), node.id(), run.workspace());
+
+            if (existing.isPresent()) {
+                log.warn("Task {} has a snapshot from an interrupted run; restoring before re-execution",
+                        node.id());
+                WorkspaceSnapshot recovered = existing.get();
+                recovered.restore();
+                run.putSnapshot(node.id(), recovered);
+                run.recordRollback();
+                metrics.recordRollback();
+                record(run, node.id(), Actor.ORCHESTRATOR, DecisionType.ROLLBACK_PERFORMED,
+                        "Restored workspace from a snapshot left by an interrupted run before re-executing "
+                                + node.id());
+                return;
+            }
+
             WorkspaceSnapshot snapshot =
                     WorkspaceSnapshot.capture(node.id(), run.workspace());
             run.putSnapshot(node.id(), snapshot);
-            log.debug("Captured pre-mutation snapshot for {} ({} files)",
+            // Persisted before the mutation happens, so the restore point survives
+            // losing the process at any point after this line.
+            snapshots.save(run.workflowId(), node.id(), snapshot);
+            log.debug("Captured and persisted pre-mutation snapshot for {} ({} files)",
                     node.id(), snapshot.fileCount());
         }
     }
@@ -289,9 +318,13 @@ public class WorkflowEngine {
     private void rollbackToLastSnapshot(WorkflowRun run, String reason) {
         run.graph().nodes().stream()
                 .filter(node -> node.agentType().mutatesWorkspace())
-                .map(node -> run.snapshot(node.id()))
-                .filter(java.util.Optional::isPresent)
-                .map(java.util.Optional::get)
+                // Memory first, disk second: after a restart the in-memory map is
+                // empty, and without the fallback a recovered run would have nothing
+                // to roll back to.
+                .map(node -> run.snapshot(node.id())
+                        .or(() -> snapshots.load(run.workflowId(), node.id(), run.workspace())))
+                .filter(Optional::isPresent)
+                .map(Optional::get)
                 .reduce((first, second) -> second)
                 .ifPresent(snapshot -> {
                     WorkspaceSnapshot.RollbackResult result = snapshot.restore();

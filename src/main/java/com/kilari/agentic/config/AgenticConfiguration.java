@@ -22,6 +22,7 @@ import com.kilari.agentic.provider.DeterministicModelProvider;
 import com.kilari.agentic.provider.ModelProvider;
 import com.kilari.agentic.service.WorkflowService;
 import com.kilari.agentic.tools.BuildValidator;
+import com.kilari.agentic.tools.SnapshotStore;
 import com.kilari.agentic.tools.WorkspaceFactory;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -75,6 +76,18 @@ public class AgenticConfiguration {
     @Bean
     public BuildValidator buildValidator() {
         return new BuildValidator();
+    }
+
+    /**
+     * Snapshots live beside the workspaces rather than inside them: a restore
+     * walks the workspace tree, so a snapshot stored within it would be walking
+     * its own backup.
+     */
+    @Bean
+    public SnapshotStore snapshotStore(
+            @Value("${agentic.workspaces.root:workspaces}") String root) {
+        return new SnapshotStore(Path.of(root).resolveSibling(
+                Path.of(root).getFileName() + "-snapshots"));
     }
 
     @Bean
@@ -133,8 +146,9 @@ public class AgenticConfiguration {
     public WorkflowEngine workflowEngine(Map<AgentType, Agent> agentRegistry,
                                          WorkflowStore store,
                                          WorkflowMetrics metrics,
-                                         PolicyGuard policyGuard) {
-        return new WorkflowEngine(agentRegistry, store, metrics, policyGuard);
+                                         PolicyGuard policyGuard,
+                                         SnapshotStore snapshotStore) {
+        return new WorkflowEngine(agentRegistry, store, metrics, policyGuard, snapshotStore);
     }
 
     @Bean

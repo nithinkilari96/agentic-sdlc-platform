@@ -186,6 +186,23 @@ public class WorkspaceSnapshot {
         }
     }
 
+    /** The captured files, for {@link SnapshotStore} to persist. */
+    Map<String, byte[]> contents() {
+        return contents;
+    }
+
+    /** Rebuilds a snapshot read back from disk. */
+    static WorkspaceSnapshot fromContents(String snapshotId, Path root, Map<String, byte[]> contents) {
+        Map<String, String> hashes = new HashMap<>();
+        contents.forEach((path, content) -> hashes.put(path, sha256(content)));
+        return new WorkspaceSnapshot(snapshotId, root, contents, hashes);
+    }
+
+    /** Exposed so the store can verify a persisted snapshot has not rotted. */
+    static String hash(byte[] content) {
+        return sha256(content);
+    }
+
     /** Content hash over raw bytes, so binaries hash as reliably as source files. */
     private static String sha256(byte[] content) {
         try {
