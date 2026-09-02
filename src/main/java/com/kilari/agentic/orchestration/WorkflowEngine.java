@@ -3,6 +3,7 @@ package com.kilari.agentic.orchestration;
 import com.kilari.agentic.agent.Agent;
 import com.kilari.agentic.agent.AgentExecution;
 import com.kilari.agentic.agent.AgentOutcome;
+import com.kilari.agentic.agent.ContextKeys;
 import com.kilari.agentic.governance.PolicyGuard;
 import com.kilari.agentic.metrics.WorkflowMetrics;
 import com.kilari.agentic.persistence.WorkflowStore;
@@ -223,7 +224,7 @@ public class WorkflowEngine {
                 node.markAwaitingHuman();
                 run.transitionTo(WorkflowState.AWAITING_CLARIFICATION, outcome.summary());
                 run.context().publish(
-                        com.kilari.agentic.agent.ContextKeys.REQUIREMENT_QUESTIONS,
+                        ContextKeys.REQUIREMENT_QUESTIONS,
                         node.agentType(), node.id(), String.join("\n", outcome.questions()));
                 metrics.recordClarificationRequested();
                 record(run, node.id(), Actor.AGENT, DecisionType.CLARIFICATION_REQUESTED,
@@ -236,7 +237,7 @@ public class WorkflowEngine {
                 node.markAwaitingHuman();
                 run.transitionTo(WorkflowState.AWAITING_APPROVAL, outcome.summary());
                 run.context().publish(
-                        com.kilari.agentic.agent.ContextKeys.RELEASE_EVIDENCE,
+                        ContextKeys.RELEASE_EVIDENCE,
                         node.agentType(), node.id(), outcome.summary());
                 record(run, node.id(), Actor.ORCHESTRATOR, DecisionType.APPROVAL_REQUESTED,
                         outcome.summary(), outcome.evidence());
@@ -290,8 +291,7 @@ public class WorkflowEngine {
             rollbackToLastSnapshot(run, "repair budget exhausted");
             run.transitionTo(WorkflowState.FAILED,
                     "validation still failing after %d repair rounds".formatted(MAX_REPAIR_ROUNDS));
-            metrics.recordWorkflowOutcome(run);
-            store.checkpoint(run);
+            finalise(run);
             return;
         }
 
@@ -349,8 +349,7 @@ public class WorkflowEngine {
                     .orElse("unknown");
             run.transitionTo(WorkflowState.FAILED, "tasks did not complete: " + failed);
         }
-        metrics.recordWorkflowOutcome(run);
-        store.checkpoint(run);
+        finalise(run);
         log.info("Workflow {} settled as {} after {}ms",
                 run.workflowId(), run.state(), run.elapsed().toMillis());
     }
@@ -360,8 +359,7 @@ public class WorkflowEngine {
         run.transitionTo(WorkflowState.SAFE_STOPPED, reason);
         record(run, null, Actor.POLICY, DecisionType.SAFE_STOP, reason);
         metrics.recordSafeStop();
-        metrics.recordWorkflowOutcome(run);
-        store.checkpoint(run);
+        finalise(run);
         log.warn("Workflow {} safe-stopped: {}", run.workflowId(), reason);
     }
 
@@ -417,8 +415,7 @@ public class WorkflowEngine {
 
         run.transitionTo(WorkflowState.COMPLETED, "approved by " + approver);
         metrics.recordApproval(true);
-        metrics.recordWorkflowOutcome(run);
-        store.checkpoint(run);
+        finalise(run);
     }
 
     /**
@@ -443,7 +440,27 @@ public class WorkflowEngine {
 
         run.transitionTo(WorkflowState.FAILED, "rejected by " + approver + ": " + reason);
         metrics.recordApproval(false);
+        finalise(run);
+    }
+
+    /**
+     * Everything that must happen exactly once when a run reaches a terminal state.
+     *
+     * <p>Five separate paths lead here — settled, safe-stopped, repair budget
+     * exhausted, approved, rejected — and each previously remembered to record the
+     * outcome and checkpoint. None of them released the snapshots, so every
+     * finished workflow left a full copy of its workspace on disk indefinitely,
+     * one per mutating task. Collapsing it into a single method means a sixth
+     * terminal path cannot forget a step.
+     *
+     * <p>Snapshots are safe to drop here precisely because the run is terminal:
+     * they exist to make rollback possible <em>during</em> execution, and there is
+     * nothing left to roll back to. Rejection rolls back before transitioning, so
+     * the restore has already happened by the time this runs.
+     */
+    private void finalise(WorkflowRun run) {
         metrics.recordWorkflowOutcome(run);
+        snapshots.deleteAll(run.workflowId());
         store.checkpoint(run);
     }
 

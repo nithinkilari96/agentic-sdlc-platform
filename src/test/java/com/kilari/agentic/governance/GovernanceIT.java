@@ -12,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.TestPropertySource;
 
+import java.nio.file.Path;
 import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -94,6 +95,31 @@ class GovernanceIT {
         assertThat(run.context().get(ContextKeys.PATCH_IMPLEMENTATION)).isEmpty();
         assertThat(run.context().content(ContextKeys.REQUIREMENT_QUESTIONS))
                 .hasValueSatisfying(questions -> assertThat(questions).isNotBlank());
+    }
+
+    @Test
+    @DisplayName("snapshots are released when a run reaches a terminal state")
+    void snapshots_do_not_accumulate_after_a_run_finishes() {
+        WorkflowRun run = workflows.start(
+                "Build a URL shortener service with create and resolve APIs.",
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
+
+        Path snapshotDir = Path.of("build/test-workspaces-governance-snapshots")
+                .resolve(run.workflowId());
+
+        // While the run is live the restore point must exist - that is what makes
+        // rollback possible mid-execution.
+        assertThat(snapshotDir)
+                .as("a live run needs its restore point")
+                .exists();
+
+        workflows.approve(run.workflowId(), "approver@example.com", "ok");
+
+        // Once terminal there is nothing left to roll back to, and keeping it costs
+        // a full copy of the workspace per mutating task, forever.
+        assertThat(snapshotDir)
+                .as("a finished run must not leave its snapshots on disk")
+                .doesNotExist();
     }
 
     private Callable<Void> decision(Runnable action, AtomicInteger succeeded, AtomicInteger refused) {
