@@ -24,5 +24,12 @@ bin/
 
 # Agent runtime artifacts (generated workspaces, snapshots, logs)
 workspaces/
+workspaces-snapshots/
 run-artifacts/
 *.log
+
+# Local H2 database. Runtime state, not source - and it embeds absolute
+# workspace paths, so committing it leaks the developer's home directory.
+data/
+*.mv.db
+*.trace.db
