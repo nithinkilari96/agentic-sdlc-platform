@@ -36,7 +36,7 @@ dependencies {
     // Official Anthropic SDK. Only the ClaudeModelProvider touches this; every
     // other layer depends on the ModelProvider interface, so the platform runs
     // end-to-end with no credentials and no vendor coupling.
-    implementation("com.anthropic:anthropic-java:2.34.0")
+    implementation("com.anthropic:anthropic-java:2.59.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
