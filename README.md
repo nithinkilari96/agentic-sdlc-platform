@@ -7,7 +7,8 @@ a human with executable evidence to approve.**
 
 The URL shortener is the workload, not the product. It exists to prove the
 platform works on something real — a greenfield build, a brownfield enhancement,
-and a requirement too vague to act on.
+a requirement too vague to act on, and a build that fails and has to be
+repaired.
 
 ---
 
@@ -126,7 +127,7 @@ Nothing else changes — the agents, graph, gates and guardrails are identical.
 See [Deterministic vs live](#deterministic-vs-live-provider) for why this
 distinction matters.
 
-### The three scenarios
+### The scenarios
 
 ```bash
 # 1. Greenfield — build the service from an empty repository
