@@ -127,6 +127,24 @@ Nothing else changes — the agents, graph, gates and guardrails are identical.
 See [Deterministic vs live](#deterministic-vs-live-provider) for why this
 distinction matters.
 
+#### Verifying the live path
+
+The live adapter is the one component not covered by the test suite, because it
+requires a credential. One greenfield run exercises it fully — requirement
+analysis, repository reasoning, architecture, code generation, tests and
+documentation, all against the real model:
+
+```bash
+export ANTHROPIC_API_KEY=sk-...     # from console.anthropic.com, not a claude.ai subscription
+./gradlew bootRun
+curl -sX POST localhost:8080/api/v1/workflows \
+  -H 'Content-Type: application/json' -H 'X-Role: OPERATOR' \
+  -d '{"requirement":"Build a URL shortener service with create, resolve and stats APIs."}'
+```
+
+Expect the startup log to read `using the live provider on claude-opus-5` rather
+than `using the deterministic provider`. The run costs a few model calls.
+
 ### The scenarios
 
 ```bash
@@ -266,10 +284,15 @@ identical `ModelProvider` interface. The orchestrator cannot tell them apart.
 Stated plainly, because a documented gap is a known risk and an undocumented one
 is a surprise in production.
 
-- **The live provider path is wired and compiles against the official Anthropic
-  SDK, but has not been executed against the real API.** No credential was
-  available during the build. The deterministic path is fully exercised; the live
-  path should be smoke-tested before being relied on.
+- **The live provider has not been executed against the real API.** No API
+  credential was available during development. What *is* verified: it compiles
+  against the official `com.anthropic:anthropic-java` SDK, and the interface it
+  implements is exercised continuously by every test in the suite. The adapter
+  itself is one class of about forty lines whose only job is to translate a
+  `ModelRequest` into a Messages API call — deliberately thin, so the unverified
+  surface is small and isolated behind `ModelProvider`. Verify it with the
+  command under [Verifying the live path](#verifying-the-live-path) before
+  relying on it.
 - **Single-process orchestration.** State is durable and crash-recoverable, but
   there is no distributed workflow ownership. Running multiple replicas needs
   leasing — Postgres advisory locks, or a durable workflow engine like Temporal.
