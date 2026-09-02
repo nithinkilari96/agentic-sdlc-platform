@@ -65,12 +65,13 @@ public class WorkflowService {
      * @param seedExistingService when true the workspace is pre-populated with the
      *                            shortener service, making this a brownfield run
      *                            against real existing code
-     * @param expectAmbiguity     when true the run starts with only the requirement
-     *                            task, so an under-specified requirement costs one
-     *                            model call rather than a full plan that is
-     *                            immediately abandoned
+     * @param shape               which graph the run starts with. Chosen by the
+     *                            caller rather than inferred from the requirement
+     *                            text, so a keyword can never silently decide
+     *                            whether the implementation step happens
      */
-    public WorkflowRun start(String requirement, boolean seedExistingService, boolean expectAmbiguity) {
+    public WorkflowRun start(String requirement, boolean seedExistingService,
+                             WorkflowPlanner.PlanShape shape) {
         String workflowId = "wf-" + UUID.randomUUID().toString().substring(0, 8);
         Path workspace = workspaces.create(workflowId);
 
@@ -78,16 +79,14 @@ public class WorkflowService {
             seedExistingCodebase(workspace);
         }
 
-        WorkflowGraph graph = expectAmbiguity
-                ? WorkflowPlanner.ambiguityProbePlan()
-                : WorkflowPlanner.initialPlan();
+        WorkflowGraph graph = shape.toGraph();
 
         WorkflowRun run = new WorkflowRun(workflowId, requirement, graph, workspace);
         active.put(workflowId, run);
         metrics.recordWorkflowStarted();
 
-        log.info("Starting workflow {} ({} tasks, {})", workflowId, graph.nodes().size(),
-                seedExistingService ? "brownfield" : "greenfield");
+        log.info("Starting workflow {} ({}, {} tasks, {})", workflowId, shape,
+                graph.nodes().size(), seedExistingService ? "brownfield" : "greenfield");
 
         engine.drive(run);
         return run;

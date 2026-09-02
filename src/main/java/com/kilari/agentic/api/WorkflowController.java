@@ -4,6 +4,7 @@ import com.kilari.agentic.agent.ContextKeys;
 import com.kilari.agentic.governance.Role;
 import com.kilari.agentic.orchestration.DecisionRecord;
 import com.kilari.agentic.orchestration.TaskNode;
+import com.kilari.agentic.orchestration.WorkflowPlanner;
 import com.kilari.agentic.orchestration.WorkflowRun;
 import com.kilari.agentic.service.WorkflowService;
 import org.springframework.http.HttpStatus;
@@ -48,7 +49,7 @@ public class WorkflowController {
         WorkflowRun run = service.start(
                 request.requirement(),
                 Boolean.TRUE.equals(request.brownfield()),
-                Boolean.TRUE.equals(request.expectAmbiguity()));
+                request.planShape());
 
         return ResponseEntity.status(HttpStatus.CREATED).body(WorkflowSummary.from(run));
     }
@@ -132,7 +133,33 @@ public class WorkflowController {
 
     // ---- payloads ----------------------------------------------------------
 
-    public record StartRequest(String requirement, Boolean brownfield, Boolean expectAmbiguity) {
+    public record StartRequest(String requirement, Boolean brownfield,
+                               Boolean expectAmbiguity, Boolean testsAndDocsOnly) {
+
+        /**
+         * Resolves the requested flags to a plan shape.
+         *
+         * <p>Rejects asking for two shapes at once rather than silently preferring
+         * one: the caller has expressed something contradictory, and picking a
+         * winner would hide that until they wondered why half their plan was
+         * missing.
+         */
+        WorkflowPlanner.PlanShape planShape() {
+            boolean ambiguous = Boolean.TRUE.equals(expectAmbiguity);
+            boolean testsAndDocs = Boolean.TRUE.equals(testsAndDocsOnly);
+
+            if (ambiguous && testsAndDocs) {
+                throw new IllegalArgumentException(
+                        "expectAmbiguity and testsAndDocsOnly select different plans; choose one");
+            }
+            if (ambiguous) {
+                return WorkflowPlanner.PlanShape.AMBIGUITY_PROBE;
+            }
+            if (testsAndDocs) {
+                return WorkflowPlanner.PlanShape.TESTS_AND_DOCS;
+            }
+            return WorkflowPlanner.PlanShape.FULL_DELIVERY;
+        }
     }
 
     public record ClarifyRequest(String clarification) {

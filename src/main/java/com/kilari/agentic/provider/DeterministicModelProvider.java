@@ -2,9 +2,11 @@ package com.kilari.agentic.provider;
 
 import com.kilari.agentic.provider.fixtures.AmbiguousFixture;
 import com.kilari.agentic.provider.fixtures.BrownfieldFixture;
+import com.kilari.agentic.provider.fixtures.BugFixFixture;
 import com.kilari.agentic.provider.fixtures.GreenfieldFixture;
 import com.kilari.agentic.provider.fixtures.RepairLoopFixture;
 import com.kilari.agentic.provider.fixtures.ScenarioFixture;
+import com.kilari.agentic.provider.fixtures.TestAndDocsFixture;
 
 import java.time.Duration;
 import java.util.List;
@@ -40,9 +42,15 @@ public class DeterministicModelProvider implements ModelProvider {
      * system behaves, since ambiguity is what remains when nothing specific fits.
      */
     private final List<ScenarioFixture> fixtures = List.of(
-            // First: matches an explicit marker, so it can never capture an
-            // ordinary requirement that happens to mention a shortener.
+            // Explicit marker, so it can never capture an ordinary requirement.
             new RepairLoopFixture(),
+
+            // Narrow subject matter, matched before the broad scenarios. A bug-fix
+            // requirement naturally mentions the shortener, so it has to be tried
+            // before the fixture that matches on exactly that phrase.
+            new BugFixFixture(),
+            new TestAndDocsFixture(),
+
             new GreenfieldFixture(),
             new BrownfieldFixture(),
             new AmbiguousFixture());

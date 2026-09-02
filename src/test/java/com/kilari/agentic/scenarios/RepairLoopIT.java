@@ -48,7 +48,7 @@ class RepairLoopIT {
         WorkflowRun run = workflows.start(
                 "Build a URL shortener with a click counter, using a " + RepairLoopFixture.TRIGGER
                         + " to exercise the repair path.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
 
         // It recovered rather than failing.
         assertThat(run.state())
@@ -112,7 +112,7 @@ class RepairLoopIT {
     void the_failing_build_is_never_presented_for_approval() {
         WorkflowRun run = workflows.start(
                 "Build a shortener with a " + RepairLoopFixture.TRIGGER + " for the repair path.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
 
         // The only approval request in the lineage comes after the passing build.
         List<DecisionRecord> lineage = run.context().lineage();

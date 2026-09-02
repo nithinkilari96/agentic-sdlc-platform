@@ -44,7 +44,7 @@ class ScenarioIT {
         WorkflowRun run = workflows.start(
                 "Build a URL shortener service with create, resolve and stats APIs, "
                         + "click analytics and reliability controls.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
 
         assertThat(run.state())
                 .as("a validated change must wait for a human, never self-approve")
@@ -76,7 +76,7 @@ class ScenarioIT {
     void brownfield_scenario() {
         WorkflowRun run = workflows.start(
                 "Add per-client rate limiting to link creation so one caller cannot exhaust the service.",
-                true, false);
+                true, WorkflowPlanner.PlanShape.FULL_DELIVERY);
 
         assertThat(run.state()).isEqualTo(WorkflowState.AWAITING_APPROVAL);
 
@@ -101,7 +101,7 @@ class ScenarioIT {
     @Test
     @DisplayName("Ambiguous: parks without generating, then re-plans once a human answers")
     void ambiguous_scenario() {
-        WorkflowRun run = workflows.start("Improve analytics", true, true);
+        WorkflowRun run = workflows.start("Improve analytics", true, WorkflowPlanner.PlanShape.AMBIGUITY_PROBE);
 
         // Stopped rather than guessed.
         assertThat(run.state()).isEqualTo(WorkflowState.AWAITING_CLARIFICATION);
@@ -145,7 +145,7 @@ class ScenarioIT {
     void rejected_change_is_rolled_back() {
         WorkflowRun run = workflows.start(
                 "Build a URL shortener service with create, resolve and stats APIs.",
-                false, false);
+                false, WorkflowPlanner.PlanShape.FULL_DELIVERY);
         assertThat(run.state()).isEqualTo(WorkflowState.AWAITING_APPROVAL);
 
         workflows.reject(run.workflowId(), "approver@example.com", "not the approach we want");

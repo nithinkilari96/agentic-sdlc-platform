@@ -130,6 +130,62 @@ public final class WorkflowPlanner {
         return new WorkflowGraph(List.of(node(TASK_REQUIREMENT, AgentType.REQUIREMENT)));
     }
 
+    /**
+     * The plan for work that improves tests and documentation without changing
+     * production code.
+     *
+     * <p>Note what is absent: there is no architecture step and no implementation
+     * step. Running them anyway would force agents to invent a design and a code
+     * change for a requirement that asks for neither, and the resulting empty or
+     * fabricated patch would be noise the approver has to see through.
+     *
+     * <p>The rest of the machinery is unchanged. The patch still goes through the
+     * same policy checks, the build still has to pass, and a human still approves
+     * — a test-only change is not a lower-risk change, it is a smaller one.
+     */
+    public static WorkflowGraph testsAndDocsPlan() {
+        return new WorkflowGraph(List.of(
+                node(TASK_REQUIREMENT, AgentType.REQUIREMENT),
+                node(TASK_REPO_ANALYSIS, AgentType.REPOSITORY_ANALYSIS, TASK_REQUIREMENT),
+
+                // Parallel, as in the full plan - neither depends on the other.
+                node(TASK_TESTS, AgentType.TEST, TASK_REPO_ANALYSIS),
+                node(TASK_DOCUMENTATION, AgentType.DOCUMENTATION, TASK_REPO_ANALYSIS),
+
+                node(TASK_PATCH_APPLY, AgentType.PATCH_APPLY, TASK_TESTS, TASK_DOCUMENTATION),
+                node(TASK_VALIDATE, AgentType.BUILD_VALIDATION, TASK_PATCH_APPLY),
+                node(TASK_RELEASE, AgentType.RELEASE_READINESS, TASK_VALIDATE)));
+    }
+
+    /**
+     * The shapes a run can start with.
+     *
+     * <p>Chosen by the operator rather than inferred from the requirement text.
+     * Inferring it would mean a keyword in a requirement could silently decide
+     * whether the implementation step happens — which is exactly the kind of
+     * control-flow decision the platform deliberately keeps away from anything
+     * the model or a prompt can influence.
+     */
+    public enum PlanShape {
+
+        /** The full SDLC plan: understand, design, implement, test, document, validate. */
+        FULL_DELIVERY,
+
+        /** Understand the requirement only, expecting it to be too vague to act on. */
+        AMBIGUITY_PROBE,
+
+        /** Improve tests and documentation without touching production code. */
+        TESTS_AND_DOCS;
+
+        public WorkflowGraph toGraph() {
+            return switch (this) {
+                case FULL_DELIVERY -> initialPlan();
+                case AMBIGUITY_PROBE -> ambiguityProbePlan();
+                case TESTS_AND_DOCS -> testsAndDocsPlan();
+            };
+        }
+    }
+
     private static TaskNode node(String id, AgentType type, String... dependsOn) {
         return new TaskNode(id, type, Set.of(dependsOn), DEFAULT_ATTEMPTS, 0);
     }
